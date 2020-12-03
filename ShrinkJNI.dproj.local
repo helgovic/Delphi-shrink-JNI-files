@@ -1,0 +1,27 @@
+﻿<?xml version="1.0" encoding="utf-8"?>
+<BorlandProject>
+	<Transactions>
+    <Transaction>1899-12-30 00:00:00.000.734,=JvCore.dcp</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.790,=D:\Deplhi\Unit1.pas</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.941,D:\Deplhi\ShrinkJNI\ShrinkJNI.dproj=D:\Deplhi\ShrinkJNI.dproj</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.048,=D:\Deplhi\ShrinkJNI\uBuildNotifier.pas</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.428,=D:\Deplhi\ShrinkJNI\UnShrinkAll.bmp</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.933,=tmsexdXE7.dcp</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.871,=tmsdXE7.dcp</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.308,=Jcl.dcp</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.786,=JvCmp.dcp</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.125,D:\Deplhi\ShrinkJNI\Unit1.dfm=D:\Deplhi\ShrinkJNI\UFWait.dfm</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.255,C:\Users\Helge\Documents\Embarcadero\Studio\Projects\Package1.dproj=D:\Deplhi\ShrinkJNI.dproj</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.762,=D:\Deplhi\ShrinkJNI\Unit1.pas</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.125,D:\Deplhi\ShrinkJNI\Unit1.pas=D:\Deplhi\ShrinkJNI\UFWait.pas</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.442,=D:\Deplhi\ShrinkJNI\Shrink.bmp</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.492,D:\Deplhi\UExpert.pas=D:\Deplhi\Unit1.pas</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.415,=D:\Deplhi\ShrinkJNI\UnShrink.bmp</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.416,=D:\Deplhi\ShrinkJNI\ShrinkAll.bmp</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.922,D:\Deplhi\ShrinkJNI\uShrinkNotifier.pas=</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.084,D:\Deplhi\ShrinkJNI\uShrinkNotifier.pas=D:\Deplhi\ShrinkJNI\uBuildNotifier.pas</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.367,=rtl.dcp</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.565,=JvMM.dcp</Transaction>
+    <Transaction>1899-12-30 00:00:00.000.010,D:\Deplhi\ShrinkJNI\UExpert.pas=D:\Deplhi\UExpert.pas</Transaction>
+  </Transactions>
+</BorlandProject>

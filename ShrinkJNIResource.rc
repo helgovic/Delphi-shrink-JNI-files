@@ -1,0 +1,4 @@
+ShrinkBmp BITMAP "Shrink.bmp"
+UnShrinkBmp BITMAP "UnShrink.bmp"
+ShrinkAllBmp BITMAP "ShrinkAll.bmp"
+UnShrinkAllBmp BITMAP "UnShrinkAll.bmp"
