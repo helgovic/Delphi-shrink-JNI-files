@@ -4,9 +4,14 @@ interface
 
 uses
   Windows, SysUtils, Classes, vcl.Menus, vcl.ActnList, ToolsAPI, vcl.ComCtrls, vcl.ExtCtrls, vcl.Graphics, vcl.Controls,
-  System.IOUtils, vcl.Dialogs, Threading;
+  System.IOUtils, vcl.Dialogs, Threading, vcl.Forms;
 
 type
+
+  TBADIToolsAPIFunctions = record
+     Class Procedure RegisterFormClassForTheming(Const AFormClass : TCustomFormClass;
+        Const Component : TComponent = Nil); static;
+  end;
 
   TShrinkJNIExpert = class(TObject)
   private
@@ -990,6 +995,7 @@ begin
          Bmp.DisposeOf;
 
          FWait := TFWait.Create(nil);
+         TBADIToolsAPIFunctions.RegisterFormClassForTheming(TFWait, FWait);
 
       end;
 
@@ -1060,6 +1066,33 @@ begin
    FWait.Free;
 
    inherited Destroy;
+end;
+
+class procedure TBADIToolsAPIFunctions.RegisterFormClassForTheming(
+  const AFormClass: TCustomFormClass; const Component: TComponent);
+begin
+
+   Var
+     {$IFDEF DXE104} // Breaking change to the Open Tools API - They fixed the wrongly defined interface
+     ITS : IOTAIDEThemingServices;
+     {$ELSE}
+     ITS : IOTAIDEThemingServices250;
+     {$ENDIF DXE104}
+
+   Begin
+     {$IFDEF DXE104}
+     If Supports(BorlandIDEServices, IOTAIDEThemingServices, ITS) Then
+     {$ELSE}
+     If Supports(BorlandIDEServices, IOTAIDEThemingServices250, ITS) Then
+     {$ENDIF DXE104}
+       If ITS.IDEThemingEnabled Then
+         Begin
+           ITS.RegisterFormClass(AFormClass);
+           If Assigned(Component) Then
+             ITS.ApplyTheme(Component);
+         End;
+   End;
+
 end;
 
 initialization
