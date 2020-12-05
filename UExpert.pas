@@ -1072,25 +1072,49 @@ class procedure TBADIToolsAPIFunctions.RegisterFormClassForTheming(
   const AFormClass: TCustomFormClass; const Component: TComponent);
 begin
 
+   {$IFDEF Ver320}
    Var
-     {$IFDEF DXE104} // Breaking change to the Open Tools API - They fixed the wrongly defined interface
-     ITS : IOTAIDEThemingServices;
-     {$ELSE}
      ITS : IOTAIDEThemingServices250;
-     {$ENDIF DXE104}
+   {$ENDIF Ver320}
+   {$IFDEF Ver330}
+   Var
+     ITS : IOTAIDEThemingServices250;
+   {$ENDIF Ver330}
+   {$IFDEF Ver340}
+   Var
+     ITS : IOTAIDEThemingServices;
+  {$ENDIF Ver340}
 
    Begin
-     {$IFDEF DXE104}
+
+     {$IFDEF Ver340}
      If Supports(BorlandIDEServices, IOTAIDEThemingServices, ITS) Then
-     {$ELSE}
-     If Supports(BorlandIDEServices, IOTAIDEThemingServices250, ITS) Then
-     {$ENDIF DXE104}
        If ITS.IDEThemingEnabled Then
          Begin
            ITS.RegisterFormClass(AFormClass);
            If Assigned(Component) Then
              ITS.ApplyTheme(Component);
          End;
+     {$ENDIF Ver340}
+
+     {$IFDEF Ver330}
+     If Supports(BorlandIDEServices, IOTAIDEThemingServices250, ITS) Then
+       If ITS.IDEThemingEnabled Then
+         Begin
+           ITS.RegisterFormClass(AFormClass);
+           If Assigned(Component) Then
+             ITS.ApplyTheme(Component);
+         End;
+     {$ENDIF Ver330}
+     {$IFDEF Ver320}
+     If Supports(BorlandIDEServices, IOTAIDEThemingServices250, ITS) Then
+       If ITS.IDEThemingEnabled Then
+         Begin
+           ITS.RegisterFormClass(AFormClass);
+           If Assigned(Component) Then
+             ITS.ApplyTheme(Component);
+         End;
+     {$ENDIF Ver320}
    End;
 
 end;
