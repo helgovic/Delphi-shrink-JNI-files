@@ -12,7 +12,6 @@ type
      Class Procedure RegisterFormClassForTheming(Const AFormClass : TCustomFormClass;
         Const Component : TComponent = Nil); static;
   end;
-
   TShrinkJNIExpert = class(TObject)
   private
     { Private declarations }
@@ -635,7 +634,7 @@ begin
 
       end;
 
-   while (x <= sl.Count - 1) and (Pos('implementation', sl[x]) = 0) do
+   while (x <= sl.Count - 1) and (Trim(sl[x]) <> 'implementation') do
       begin
 
          if (Pos('class = interface(', AnsiLowerCase(sl[x])) > 0)
@@ -701,7 +700,7 @@ begin
          Inc(x);
       end;
 
-   while (x <= sl.Count - 1) and (Pos('initialization', sl[x]) = 0) do
+   while (x <= sl.Count - 1) and (Trim(sl[x]) <> 'initialization') do
       begin
 
          if (Pos('TRegTypes.RegisterType(', sl[x]) > 0)
@@ -1121,8 +1120,6 @@ end;
 
 initialization
   FShrinkJNIExpert := TShrinkJNIExpert.Instance;
-
 finalization
   FreeAndNil(FShrinkJNIExpert);
-
 end.
