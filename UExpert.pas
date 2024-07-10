@@ -4,15 +4,18 @@ interface
 
 uses
   Windows, SysUtils, Classes, vcl.Menus, vcl.ActnList, ToolsAPI, vcl.ComCtrls, vcl.ExtCtrls, vcl.Graphics, vcl.Controls,
-  System.IOUtils, vcl.Dialogs, Threading, vcl.Forms;
+  System.IOUtils, vcl.Dialogs, Threading, vcl.Forms, vcl.VirtualImageList, Vcl.ImageCollection;
 
 type
+
+  TGraphicHack = class(TGraphic);
 
   TBADIToolsAPIFunctions = record
      Class Procedure RegisterFormClassForTheming(Const AFormClass : TCustomFormClass;
         Const Component : TComponent = Nil); static;
   end;
-  TShrinkJNIExpert = class(TObject)
+
+  TJavaLoginMethodsExpert = class(TObject)
   private
     { Private declarations }
     FProjectMenu,
@@ -39,11 +42,11 @@ type
     { Public declarations }
     constructor Create; virtual;
     destructor Destroy; override;
-    class function Instance: TShrinkJNIExpert;
+    class function Instance: TJavaLoginMethodsExpert;
   public
   end;
 
-  function ShrinkJNIExpert: TShrinkJNIExpert;
+  function ShrinkJNIExpert: TJavaLoginMethodsExpert;
 
 implementation
 
@@ -51,9 +54,83 @@ uses
    JclStrings, UFWait;
 
 var
-   FShrinkJNIExpert: TShrinkJNIExpert;
+   FJavaLogInMethodsExpert: TJavaLoginMethodsExpert;
    JNIFiles: array of string;
    FileList: TArray<String>;
+
+{$IFDEF VER360}
+{$ELSEIF VER350}
+{$ELSE}
+function AddIconToImageList(AIcon: TIcon; ImageList: TCustomImageList;
+  Stretch: Boolean): Integer;
+const
+  MaskColor = clBtnFace;
+var
+  SrcBmp, DstBmp: TBitmap;
+  PSrc1, PSrc2, PDst: PRGBArray;
+  X, Y: Integer;
+begin
+  Assert(Assigned(AIcon));
+  Assert(Assigned(ImageList));
+
+{$IFDEF DEBUG}
+  if not AIcon.Empty then
+    CnDebugger.LogFmt('AddIcon %dx%d To ImageList %dx%d', [AIcon.Width, AIcon.Height,
+      ImageList.Width, ImageList.Height]);
+{$ENDIF}
+
+  if (ImageList.Width = 16) and (ImageList.Height = 16) and not AIcon.Empty and
+    (AIcon.Width = 32) and (AIcon.Height = 32) then
+  begin
+    if Stretch then // ImageList 尺寸比图标大，指定拉伸的情况下，使用平滑处理
+    begin
+      SrcBmp := nil;
+      DstBmp := nil;
+      try
+        SrcBmp := CreateEmptyBmp24(32, 32, MaskColor);
+        DstBmp := CreateEmptyBmp24(16, 16, MaskColor);
+        SrcBmp.Canvas.Draw(0, 0, AIcon);
+        for Y := 0 to DstBmp.Height - 1 do
+        begin
+          PSrc1 := SrcBmp.ScanLine[Y * 2];
+          PSrc2 := SrcBmp.ScanLine[Y * 2 + 1];
+          PDst := DstBmp.ScanLine[Y];
+          for X := 0 to DstBmp.Width - 1 do
+          begin
+            PDst^[X].b := (PSrc1^[X * 2].b + PSrc1^[X * 2 + 1].b + PSrc2^[X * 2].b
+              + PSrc2^[X * 2 + 1].b) shr 2;
+            PDst^[X].g := (PSrc1^[X * 2].g + PSrc1^[X * 2 + 1].g + PSrc2^[X * 2].g
+              + PSrc2^[X * 2 + 1].g) shr 2;
+            PDst^[X].r := (PSrc1^[X * 2].r + PSrc1^[X * 2 + 1].r + PSrc2^[X * 2].r
+              + PSrc2^[X * 2 + 1].r) shr 2;
+          end;
+        end;
+        Result := ImageList.AddMasked(DstBmp, MaskColor);
+      finally
+        if Assigned(SrcBmp) then FreeAndNil(SrcBmp);
+        if Assigned(DstBmp) then FreeAndNil(DstBmp);
+      end;
+    end
+    else
+    begin
+      // 指定不拉伸的情况下，把 32*32 图标的左上角 16*16 部分绘制来加入
+      DstBmp := nil;
+      try
+        DstBmp := CreateEmptyBmp24(16, 16, MaskColor);
+        DstBmp.Canvas.Draw(0, 0, AIcon);
+        Result := ImageList.AddMasked(DstBmp, MaskColor);
+      finally
+        DstBmp.Free;
+      end;
+    end;
+  end
+  else if not AIcon.Empty then
+    Result := ImageList.AddIcon(AIcon)
+  else
+    Result := -1;
+end;
+
+{$ENDIF}
 
 function GetCurrentEditorFileName: string;
 var
@@ -227,20 +304,77 @@ begin
                if not Found
                then
                   begin
-                     Captions.DisposeOf;
+                     Captions.Free;
                      Exit;
                   end;
 
             end;
 
          Result := MenuItems;
-         Captions.DisposeOf;
+         Captions.Free;
 
       end;
 
 end;
 
-procedure TShrinkJNIExpert.UnShrinkAllExecute(Sender: TObject);
+function AddGraphicToVirtualImageList(Graphic: TGraphic; DstVirtual: TVirtualImageList;
+  const ANamePrefix: string; Disabled: Boolean): Integer;
+var
+  C: Integer;
+  R: TRect;
+  Bmp: TBitmap;
+  Mem: TMemoryStream;
+  Collection: TImageCollection;
+begin
+  Result := -1;
+  if (Graphic = nil) or (DstVirtual = nil) then
+    Exit;
+
+  if DstVirtual.ImageCollection is TImageCollection then
+    Collection := DstVirtual.ImageCollection as TImageCollection
+  else
+    Exit;
+
+  C := Collection.Count;
+  Mem := TMemoryStream.Create;
+  try
+    if Graphic is TIcon then // 是 Icon 则直接存避免丢失透明度
+    begin
+      Mem.Clear;
+      (Graphic as TIcon).SaveToStream(Mem);
+    end
+    else if Graphic is TBitmap then
+    begin
+      Mem.Clear;
+      (Graphic as TBitmap).SaveToStream(Mem);
+    end
+    else
+    begin
+      Bmp := TBitmap.Create;
+      try
+        Bmp.PixelFormat := pf32bit;
+        Bmp.AlphaFormat := afIgnored;
+        Bmp.Width := Graphic.Width;
+        Bmp.Height := Graphic.Height;
+        R := Rect(0, 0, Bmp.Width, Bmp.Height);
+        TGraphicHack(Graphic).Draw(Bmp.Canvas, R);
+
+        Mem.Clear;
+        Bmp.SaveToStream(Mem);
+      finally
+        Bmp.Free;
+      end;
+    end;
+    Collection.Add(ANamePrefix + IntToStr(C), Mem);
+  finally
+    Mem.Free;
+  end;
+
+  DstVirtual.Add('', C, C, Disabled);
+  Result := DstVirtual.Count - 1;
+end;
+
+procedure TJavaLoginMethodsExpert.UnShrinkAllExecute(Sender: TObject);
 begin
 
    FWait.Show;
@@ -324,7 +458,7 @@ begin
 
 end;
 
-procedure TShrinkJNIExpert.CurrUnShrinkExecute(Sender: TObject);
+procedure TJavaLoginMethodsExpert.CurrUnShrinkExecute(Sender: TObject);
 
 var
    FileName: String;
@@ -362,7 +496,7 @@ begin
 
 end;
 
-procedure TShrinkJNIExpert.ShrinkFile(FileName: String);
+procedure TJavaLoginMethodsExpert.ShrinkFile(FileName: String);
 
 var
    x, y, z: integer;
@@ -604,127 +738,142 @@ begin
          end);
    end;
 
-   AssignFile(PasFileOut, StrBefore('.pas', FileName) + 'SH.pas');
-   Rewrite(PasFileOut);
+   try
 
-   x := 0;
+      AssignFile(PasFileOut, StrBefore('.pas', FileName) + 'SH.pas');
+      Rewrite(PasFileOut);
 
-   while (x <= sl.Count - 1) and (Pos(' = interface;', sl[x]) = 0) do
-      begin
-         Writeln(PasFileOut, sl[x]);
-         Inc(x);
-      end;
+      x := 0;
 
-   while (x <= sl.Count - 1) and (Pos('class = interface(', AnsiLowerCase(sl[x])) = 0) do
-      begin
-
-         if (Pos(' = interface;', sl[x]) > 0)
-         then
-            begin
-
-               if (StrInArray(AnsiLowerCase(Trim(StrBefore(' = interface;', Sl[x]))), ClassesUsed))
-               then
-                  Writeln(PasFileOut, sl[x]);
-
-            end
-         else
+      while (x <= sl.Count - 1) and (Pos(' = interface;', sl[x]) = 0) do
+         begin
             Writeln(PasFileOut, sl[x]);
+            Inc(x);
+         end;
 
-         Inc(x);
+      while (x <= sl.Count - 1) and (Pos('class = interface(', AnsiLowerCase(sl[x])) = 0) do
+         begin
 
-      end;
-
-   while (x <= sl.Count - 1) and (Trim(sl[x]) <> 'implementation') do
-      begin
-
-         if (Pos('class = interface(', AnsiLowerCase(sl[x])) > 0)
-         then
-            begin
-
-               TmpStr := 't' + AnsiLowerCase(Trim(StrBefore('class = interface(', AnsiLowerCase(Sl[x]))));
-
-               if (StrInArray(AnsiLowerCase(Trim(StrBefore('class = interface(', AnsiLowerCase(Sl[x])))), ClassesUsed))
-               then
-                  begin
-
-                     while Pos(TmpStr, AnsiLowerCase(Sl[x])) = 0 do
-                         begin
-                            Writeln(PasFileOut, sl[x]);
-                            Inc(x);
-                         end;
-
-                     Writeln(PasFileOut, sl[x]);
-                     Inc(x);
-
-                     while (x <= sl.Count - 1) and (Trim(sl[x]) <> '') do
-                        begin
-                           Writeln(PasFileOut, sl[x]);
-                           Inc(x);
-                        end;
-
-                      Writeln(PasFileOut, sl[x]);
-
-                  end
-               else
-                  begin
-
-                      while Pos(TmpStr, AnsiLowerCase(Sl[x])) = 0 do
-                         Inc(x);
-
-                     Inc(x);
-
-                      while (x <= sl.Count - 1) and (Trim(sl[x]) <> '') do
-                         Inc(x);
-
-                  end
-
-            end
-         else
-            if (Pos('//', sl[x]) > 0) and
-               (Trim(StrBefore('//', sl[x])) = '')
+            if (Pos(' = interface;', sl[x]) > 0)
             then
+               begin
+
+                  if (StrInArray(AnsiLowerCase(Trim(StrBefore(' = interface;', Sl[x]))), ClassesUsed))
+                  then
+                     Writeln(PasFileOut, sl[x]);
+
+               end
             else
                Writeln(PasFileOut, sl[x]);
 
-         Inc(x);
+            Inc(x);
 
-         if x = sl.count - 1
-         then
-            Writeln(PasFileOut, sl[x]);
+         end;
 
-      end;
+      while (x <= sl.Count - 1) and (Trim(sl[x]) <> 'implementation') do
+         begin
 
-   while (x <= sl.Count - 1) and (Pos('TRegTypes.RegisterType(', sl[x]) = 0)  do
-      begin
-         Writeln(PasFileOut, sl[x]);
-         Inc(x);
-      end;
+            if (Pos('class = interface(', AnsiLowerCase(sl[x])) > 0) and
+               (not Trim(sl[x]).StartsWith('//'))
+            then
+               begin
 
-   while (x <= sl.Count - 1) and (Trim(sl[x]) <> 'initialization') do
-      begin
+                  TmpStr := 't' + AnsiLowerCase(Trim(StrBefore('class = interface(', AnsiLowerCase(Sl[x]))));
 
-         if (Pos('TRegTypes.RegisterType(', sl[x]) > 0)
-         then
-            begin
+                  if (StrInArray(AnsiLowerCase(Trim(StrBefore('class = interface(', AnsiLowerCase(Sl[x])))), ClassesUsed))
+                  then
+                     begin
 
-               TmpStr := AnsiLowerCase(StrBefore(''',', StrAfter(StrBefore('.pas', ExtractFileName(FileName)) + '.', sl[x])));
-               if StrInArray(TmpStr, ClassesUsed)
+                        while Pos(TmpStr, AnsiLowerCase(Sl[x])) = 0 do
+                            begin
+                               Writeln(PasFileOut, sl[x]);
+                               Inc(x);
+                            end;
+
+                        Writeln(PasFileOut, sl[x]);
+                        Inc(x);
+
+                        while (x <= sl.Count - 1) and (Trim(sl[x]) <> '') do
+                           begin
+                              Writeln(PasFileOut, sl[x]);
+                              Inc(x);
+                           end;
+
+                         Writeln(PasFileOut, sl[x]);
+
+                     end
+                  else
+                     begin
+
+                         while Pos(TmpStr, AnsiLowerCase(Sl[x])) = 0 do
+                            Inc(x);
+
+                        Inc(x);
+
+                         while (x <= sl.Count - 1) and (Trim(sl[x]) <> '') do
+                            Inc(x);
+
+                     end
+
+               end
+            else
+               if (Pos('//', sl[x]) > 0) and
+                  (Trim(StrBefore('//', sl[x])) = '')
                then
+               else
                   Writeln(PasFileOut, sl[x]);
 
-            end
-         else
+            Inc(x);
+
+            if x = sl.count - 1
+            then
+               Writeln(PasFileOut, sl[x]);
+
+         end;
+
+      while (x <= sl.Count - 1) and (Pos('TRegTypes.RegisterType(', sl[x]) = 0)  do
+         begin
             Writeln(PasFileOut, sl[x]);
+            Inc(x);
+         end;
 
-         Inc(x);
+      if x >= sl.count - 1
+      then
+         ShowMessage('EOF : ' + FileName);
 
-      end;
+      while (x <= sl.Count - 1) and (Trim(sl[x]) <> 'initialization') do
+         begin
 
-   while x <= sl.Count - 1 do
+            if (Pos('TRegTypes.RegisterType(', sl[x]) > 0)
+            then
+               begin
+
+                  TmpStr := AnsiLowerCase(StrBefore(''',', StrAfter(StrBefore('.pas', ExtractFileName(FileName)) + '.', sl[x])));
+                  if StrInArray(TmpStr, ClassesUsed)
+                  then
+                     Writeln(PasFileOut, sl[x]);
+
+               end
+            else
+               Writeln(PasFileOut, sl[x]);
+
+            Inc(x);
+
+         end;
+
+      while x <= sl.Count - 1 do
+         begin
+            Writeln(PasFileOut, sl[x]);
+            Inc(x);
+         end;
+
+   except
+      TThread.Synchronize(TThread.CurrentThread,
+      procedure
       begin
-         Writeln(PasFileOut, sl[x]);
-         Inc(x);
-      end;
+         ShowMessage('Error LineNo = ' + x.ToString + 'class = ' + TmpStr);
+      end);
+   end;
 
    CloseFile(PasFileOut);
    sl.Free;
@@ -745,7 +894,7 @@ begin
 
 end;
 
-procedure TShrinkJNIExpert.CurrShrinkExecute(Sender: TObject);
+procedure TJavaLoginMethodsExpert.CurrShrinkExecute(Sender: TObject);
 begin
 
    FWait.Show;
@@ -800,19 +949,19 @@ begin
 
 end;
 
-function ShrinkJNIExpert: TShrinkJNIExpert;
+function ShrinkJNIExpert: TJavaLoginMethodsExpert;
 begin
-  Result := TShrinkJNIExpert.Instance;
+  Result := TJavaLoginMethodsExpert.Instance;
 end;
 
-class function TShrinkJNIExpert.Instance: TShrinkJNIExpert;
+class function TJavaLoginMethodsExpert.Instance: TJavaLoginMethodsExpert;
 begin
-  if FShrinkJNIExpert = nil then
-    FShrinkJNIExpert := TShrinkJNIExpert.Create;
-  Result := FShrinkJNIExpert;
+  if FJavaLogInMethodsExpert = nil then
+    FJavaLogInMethodsExpert := TJavaLoginMethodsExpert.Create;
+  Result := FJavaLogInMethodsExpert;
 end;
 
-procedure TShrinkJNIExpert.ShrinkAllExecute(Sender: TObject);
+procedure TJavaLoginMethodsExpert.ShrinkAllExecute(Sender: TObject);
 begin
 
    FWait.Show;
@@ -875,7 +1024,7 @@ begin
 
 end;
 
-constructor TShrinkJNIExpert.Create;
+constructor TJavaLoginMethodsExpert.Create;
 
 var
    NTAServices : INTAServices;
@@ -891,7 +1040,7 @@ begin
    then
       begin
 
-         FProjectMenu := FindMenuItem('Project;QA Audits...');
+         FProjectMenu := FindMenuItem('Project');
 
          Bmp := TBitmap.Create;
 
@@ -910,11 +1059,17 @@ begin
          FMenuShrinkAll.AutoHotkeys := maAutomatic;
          FMenuShrinkAll.Action := FActionShrinkAll;
 
-         NTAServices.AddActionMenu(FProjectMenu.Name, FActionShrinkAll, FMenuShrinkAll, True);
+         NTAServices.AddActionMenu(FProjectMenu.Name, FActionShrinkAll, FMenuShrinkAll, False, True);
 
          Bmp.LoadFromResourceName(HInstance, 'ShrinkAllBmp');
-         ImageIndex := NTAServices.AddMasked(Bmp, Bmp.TransparentColor,
-                                  'Softmagical Shrink All icon');
+
+         {$IFDEF VER360}
+             ImageIndex := AddGraphicToVirtualImageList(bmp, NTAServices.ImageList as TVirtualImageList, '', False);
+         {$ELSEIF VER350}
+             ImageIndex := AddGraphicToVirtualImageList(bmp, NTAServices.ImageList as TVirtualImageList, '', False);
+         {$ELSE}
+             ImageIndex := AddIconToImageList(AWizAction.FIcon, Svcs40.ImageList, False);
+         {$ENDIF}
 
          FActionShrinkAll.ImageIndex := ImageIndex;
          FMenuShrinkAll.ImageIndex := ImageIndex;
@@ -934,11 +1089,17 @@ begin
          FMenuCurrShrink.AutoHotkeys := maAutomatic;
          FMenuCurrShrink.Action := FActionCurrShrink;
 
-         NTAServices.AddActionMenu(FProjectMenu.Name, FActionCurrShrink, FMenuCurrShrink, True);
+         NTAServices.AddActionMenu(FProjectMenu.Name, FActionCurrShrink, FMenuCurrShrink, False, True);
 
          Bmp.LoadFromResourceName(HInstance, 'ShrinkBmp');
-         ImageIndex := NTAServices.AddMasked(Bmp, Bmp.TransparentColor,
-                                  'Softmagical Shrink Current icon');
+
+         {$IFDEF VER360}
+             ImageIndex := AddGraphicToVirtualImageList(bmp, NTAServices.ImageList as TVirtualImageList, '', False);
+         {$ELSEIF VER350}
+             ImageIndex := AddGraphicToVirtualImageList(bmp, NTAServices.ImageList as TVirtualImageList, '', False);
+         {$ELSE}
+             ImageIndex := AddIconToImageList(AWizAction.FIcon, Svcs40.ImageList, False);
+         {$ENDIF}
 
          FActionCurrShrink.ImageIndex := ImageIndex;
          FMenuCurrShrink.ImageIndex := ImageIndex;
@@ -958,11 +1119,17 @@ begin
          FMenuCurrUnShrink.AutoHotkeys := maAutomatic;
          FMenuCurrUnShrink.Action := FActionCurrUnShrink;
 
-         NTAServices.AddActionMenu(FProjectMenu.Name, FActionCurrUnShrink, FMenuCurrUnShrink, True);
+         NTAServices.AddActionMenu(FProjectMenu.Name, FActionCurrUnShrink, FMenuCurrUnShrink, False, True);
 
          Bmp.LoadFromResourceName(HInstance, 'UnShrinkBmp');
-         ImageIndex := NTAServices.AddMasked(Bmp, Bmp.TransparentColor,
-                                  'Softmagical UnShrink Current icon');
+
+         {$IFDEF VER360}
+             ImageIndex := AddGraphicToVirtualImageList(bmp, NTAServices.ImageList as TVirtualImageList, '', False);
+         {$ELSEIF VER350}
+             ImageIndex := AddGraphicToVirtualImageList(bmp, NTAServices.ImageList as TVirtualImageList, '', False);
+         {$ELSE}
+             ImageIndex := AddIconToImageList(AWizAction.FIcon, Svcs40.ImageList, False);
+         {$ENDIF}
 
          FActionCurrUnShrink.ImageIndex := ImageIndex;
          FMenuCurrUnShrink.ImageIndex := ImageIndex;
@@ -982,16 +1149,22 @@ begin
          FMenuUnShrinkAll.AutoHotkeys := maAutomatic;
          FMenuUnShrinkAll.Action := FActionUnShrinkAll;
 
-         NTAServices.AddActionMenu(FProjectMenu.Name, FActionUnShrinkAll, FMenuUnShrinkAll, True);
+         NTAServices.AddActionMenu(FProjectMenu.Name, FActionUnShrinkAll, FMenuUnShrinkAll, False, True);
 
          Bmp.LoadFromResourceName(HInstance, 'UnShrinkAllBmp');
-         ImageIndex := NTAServices.AddMasked(Bmp, Bmp.TransparentColor,
-                                  'Softmagical UnShrink All icon');
+
+         {$IFDEF VER360}
+             ImageIndex := AddGraphicToVirtualImageList(bmp, NTAServices.ImageList as TVirtualImageList, '', False);
+         {$ELSEIF VER350}
+             ImageIndex := AddGraphicToVirtualImageList(bmp, NTAServices.ImageList as TVirtualImageList, '', False);
+         {$ELSE}
+             ImageIndex := AddIconToImageList(AWizAction.FIcon, Svcs40.ImageList, False);
+         {$ENDIF}
 
          FActionUnShrinkAll.ImageIndex := ImageIndex;
          FMenuUnShrinkAll.ImageIndex := ImageIndex;
 
-         Bmp.DisposeOf;
+         Bmp.Free;
 
          FWait := TFWait.Create(nil);
          TBADIToolsAPIFunctions.RegisterFormClassForTheming(TFWait, FWait);
@@ -1000,7 +1173,7 @@ begin
 
 end;
 
-procedure TShrinkJNIExpert.RemoveActionFromToolbar(AAction: TAction);
+procedure TJavaLoginMethodsExpert.RemoveActionFromToolbar(AAction: TAction);
 var
   Services : INTAServices;
 begin
@@ -1014,7 +1187,7 @@ begin
 //  RemoveAction(AAction, Services.ToolBar['InternetToolBar']);
 end;
 
-procedure TShrinkJNIExpert.RemoveAction(AAction: TAction; AToolbar: TToolbar);
+procedure TJavaLoginMethodsExpert.RemoveAction(AAction: TAction; AToolbar: TToolbar);
 var
   iCounter: Integer;
   btnTool : TToolButton;
@@ -1030,7 +1203,7 @@ begin
   end;
 end;
 
-function TShrinkJNIExpert.AddAction(ACaption, AHint, AName: String;
+function TJavaLoginMethodsExpert.AddAction(ACaption, AHint, AName: String;
   AExecuteEvent, AUpdateEvent: TNotifyEvent): TAction;
 var
   Service : INTAServices;
@@ -1051,7 +1224,7 @@ begin
   end;
 end;
 
-destructor TShrinkJNIExpert.Destroy;
+destructor TJavaLoginMethodsExpert.Destroy;
 begin
 
    FMenuShrinkAll.Free;
@@ -1119,7 +1292,7 @@ begin
 end;
 
 initialization
-  FShrinkJNIExpert := TShrinkJNIExpert.Instance;
+  FJavaLogInMethodsExpert := TJavaLoginMethodsExpert.Instance;
 finalization
-  FreeAndNil(FShrinkJNIExpert);
+  FreeAndNil(FJavaLogInMethodsExpert);
 end.
